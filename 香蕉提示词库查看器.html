@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>香蕉提示词库查看器</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --border:#e2e5ea; --text:#1f2329; --muted:#7a8194;
+    --accent:#2f6bff; --accent-soft:#eaf0ff; --badge-banana:#b45309; --badge-banana-bg:#fff7e6;
+    --badge-lb:#0e7490; --badge-lb-bg:#e6f7fb; --badge-other:#6b7280; --badge-other-bg:#f3f4f6;
+    --hover:#f0f2f5; --mono:Consolas,Menlo,monospace;
+  }
+  [data-theme="dark"]{
+    --bg:#14161a; --card:#1d2026; --border:#30343c; --text:#e6e8eb; --muted:#8b93a3;
+    --accent:#6c96ff; --accent-soft:#232b3d; --badge-banana:#f59e0b; --badge-banana-bg:#33270f;
+    --badge-lb:#22c1e3; --badge-lb-bg:#0e2a33; --badge-other:#9aa3b2; --badge-other-bg:#2a2e36;
+    --hover:#262a31;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;padding:16px}
+  .bar{position:sticky;top:0;z-index:10;background:var(--bg);padding:10px 0;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .bar h1{font-size:16px;margin-right:auto}
+  .btn{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:13px;white-space:nowrap}
+  .btn:hover{opacity:.9}
+  .btn.gray{background:var(--border);color:var(--text)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  select,input[type=text]{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;outline:none}
+  input[type=text]{width:220px}
+  .stats{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+  .svc-tip{background:var(--badge-banana-bg);color:var(--badge-banana);border-radius:8px;padding:8px 12px;margin:10px 0;font-size:13px}
+  .chip{background:var(--card);border:1px solid var(--border);border-radius:999px;padding:4px 12px;font-size:12px;color:var(--muted)}
+  .chip b{color:var(--text);font-size:13px}
+  .chip.banana{background:var(--badge-banana-bg);border-color:transparent;color:var(--badge-banana)}
+  .chip.lb{background:var(--badge-lb-bg);border-color:transparent;color:var(--badge-lb)}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .item{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;gap:12px;align-items:flex-start}
+  .item .idx{color:var(--muted);font:12px var(--mono);width:52px;flex-shrink:0;padding-top:2px}
+  .item .body{flex:1;min-width:0}
+  .item .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px;font-size:12px;color:var(--muted)}
+  .badge{display:inline-block;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:600}
+  .badge.b{background:var(--badge-banana-bg);color:var(--badge-banana)}
+  .badge.l{background:var(--badge-lb-bg);color:var(--badge-lb)}
+  .badge.o{background:var(--badge-other-bg);color:var(--badge-other)}
+  .item .tid{font:12px var(--mono);color:var(--accent)}
+  .item .ttl{font-weight:600;font-size:12px;color:var(--text)}
+  .item .prompt{font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+  .item .prompt.open{-webkit-line-clamp:unset;display:block}
+  .item .copy{margin-left:auto;flex-shrink:0;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px}
+  .item .copy:hover{color:var(--accent);border-color:var(--accent)}
+  .item .ck{flex-shrink:0;width:16px;height:16px;margin-top:4px;accent-color:var(--accent);cursor:pointer}
+  .item .del{flex-shrink:0;border:1px solid var(--border);background:transparent;color:#e05555;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:12px;margin-left:6px}
+  .item .del:hover{color:#fff;border-color:#e05555;background:#e05555}
+  .btn.danger{border-color:#e05555;color:#e05555;background:transparent}
+  .btn.danger:hover{background:#e05555;color:#fff}
+  .pager{display:flex;gap:10px;align-items:center;justify-content:center;margin:16px 0 8px;font-size:13px;color:var(--muted)}
+  .empty{padding:60px 0;text-align:center;color:var(--muted)}
+  .empty .big{font-size:40px;margin-bottom:10px}
+  .tip{color:var(--muted);font-size:12px;margin-top:6px}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:8px 18px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s}
+  #toast.show{opacity:.95}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <h1>🍌 香蕉提示词库查看器</h1>
+  <select id="srcFilter">
+    <option value="all">全部来源</option>
+    <option value="banana">香蕉新抓 (banana)</option>
+    <option value="localbanana">香蕉原始 (localbanana)</option>
+    <option value="other">其他来源</option>
+  </select>
+  <input type="text" id="kw" placeholder="搜索提示词 / 标题 / target_id...">
+  <button class="btn gray" id="resetBtn" title="清空搜索与筛选, 回到第一页">🏠 返回首页</button>
+  <select id="sortSel" title="排序方式">
+    <option value="ts_desc">时间：最新优先</option>
+    <option value="ts_asc">时间：最早优先</option>
+    <option value="title_asc">标题：A→Z</option>
+    <option value="title_desc">标题：Z→A</option>
+    <option value="size_desc">尺寸：大→小</option>
+    <option value="size_asc">尺寸：小→大</option>
+    <option value="src">来源分组</option>
+  </select>
+  <button class="btn gray" id="themeBtn" title="切换深浅色">🌓 深色</button>
+  <button class="btn gray" id="selPageBtn" style="display:none" title="勾选当前页所有条目">☑ 全选本页</button>
+  <button class="btn danger" id="delSelBtn" style="display:none" title="删除勾选的条目">🗑 删除选中(0)</button>
+  <button class="btn" id="fetchBtn" title="调用每日抓取脚本抓取 localbanana 最新提示词(需 v2RayN 代理 10808)">🔄 抓取最新</button>
+  <button class="btn" id="loadBtn">📂 选择 prompt_cache.json</button>
+  <input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+</div>
+
+<div class="svc-tip" id="svcTip" style="display:none">⚠️ 当前是「直接打开」模式：搜索/筛选/选文件都可用；<b>「🔄 抓取最新」需要服务模式</b>，请关闭本页，双击 <b>打开查看器.bat</b> 重新打开。</div>
+<div class="stats" id="stats"></div>
+<div class="list" id="list"></div>
+<div class="pager" id="pager" style="display:none"></div>
+<div class="empty" id="empty" style="display:none">
+  <div class="big">📂</div>
+  还没加载文件。<br>点击右上角「选择 prompt_cache.json」加载提示词库。<br>
+  <div class="tip">库路径：L:\ComfyUI\ComfyUI\custom_nodes\CosplayPromptNode\prompt_cache.json</div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  let all=[], view=[], page=1, perPage=100;
+  const selected=new Set();
+  const state={src:'all',kw:'',theme:localStorage.getItem('banaTheme')||'light'};
+  const svcMode=(location.protocol==='http:'||location.protocol==='https:');
+
+  const srcOf=v=> v.source==='banana' ? 'banana' : (v.src==='localbanana' ? 'localbanana' : 'other');
+  const badgeCls=s=> s==='banana'?'b':(s==='localbanana'?'l':'o');
+  const srcName=s=> s==='banana'?'香蕉新抓':(s==='localbanana'?'香蕉原始':'其他');
+  const fmtTs=t=>{ if(!t) return ''; try{ return new Date(t*1000).toLocaleString('zh-CN',{hour12:false}); }catch(e){ return t; } };
+  const dims=v=> (v.width&&v.height)?`${v.width}×${v.height}`:'';
+
+  function applyFilter(){
+    const kws=state.kw.trim().toLowerCase();
+    view=all.filter(v=>{
+      if(state.src!=='all' && srcOf(v)!==state.src) return false;
+      if(!kws) return true;
+      const p=(v.prompt||'')+' '+(v.prompt_zh||'')+' '+(v.title||'')+' '+(v.title_en||'')+' '+(v.title_zh||'')+' '+(v.target_id||'')+' '+(v.key||'');
+      return p.toLowerCase().includes(kws);
+    });
+    const ck=(a,b)=>((a||'').localeCompare(b||'','zh-Hans-CN'));
+    const sortV=$('sortSel').value;
+    view.sort((a,b)=>{
+      if(sortV==='ts_desc'){ const ta=a.ts?1:0,tb=b.ts?1:0; if(ta!==tb) return tb-ta; return (b.ts||0)-(a.ts||0); }
+      if(sortV==='ts_asc'){ const ta=a.ts?1:0,tb=b.ts?1:0; if(ta!==tb) return ta-tb; return (a.ts||0)-(b.ts||0); }
+      const ta=a.title||a.title_en||a.title_zh||'', tb=b.title||b.title_en||b.title_zh||'';
+      if(sortV==='title_asc') return ck(ta,tb);
+      if(sortV==='title_desc') return -ck(ta,tb);
+      const sa=(a.width||0)*(a.height||0), sb=(b.width||0)*(b.height||0);
+      if(sortV==='size_desc') return sb-sa;
+      if(sortV==='size_asc') return sa-sb;
+      if(sortV==='src') return ck(srcOf(a),srcOf(b)) || ((b.ts||0)-(a.ts||0));
+      return 0;
+    });
+    page=1;
+    render();
+  }
+
+  function renderStats(){
+    const c=all.length?{banana:0,localbanana:0,other:0}:null;
+    if(c) all.forEach(v=>c[srcOf(v)]++);
+    $('stats').innerHTML = all.length
+      ? `<span class="chip">总条数 <b>${all.length}</b></span>`+
+        `<span class="chip banana">香蕉新抓 <b>${c.banana}</b></span>`+
+        `<span class="chip lb">香蕉原始 <b>${c.localbanana}</b></span>`+
+        `<span class="chip">其他 <b>${c.other}</b></span>`
+      : '';
+  }
+
+  function render(){
+    renderStats();
+    if(!view.length){
+      $('list').innerHTML='';
+      $('pager').style.display='none';
+      $('empty').style.display='block';
+      $('empty').innerHTML= all.length
+        ? `<div class="big">🔍</div>没有匹配的条目，换个关键词或筛选试试。`
+        : `<div class="big">📂</div>还没加载文件。<br>点击右上角「选择 prompt_cache.json」加载提示词库。<br><div class="tip">库路径：L:\\ComfyUI\\ComfyUI\\custom_nodes\\CosplayPromptNode\\prompt_cache.json</div>`;
+      return;
+    }
+    $('empty').style.display='none';
+    const totalPages=Math.max(1,Math.ceil(view.length/perPage));
+    if(page>totalPages) page=totalPages;
+    const slice=view.slice((page-1)*perPage, page*perPage);
+    const start=(page-1)*perPage+1;
+    $('list').innerHTML=slice.map((v,i)=>{
+      const s=srcOf(v);
+      return `<div class="item">
+        ${svcMode?`<input type="checkbox" class="ck" data-k="${encodeURIComponent(v.key||'')}" title="勾选后可批量删除" ${selected.has(v.key)?'checked':''}>`:''}
+        <div class="idx">${String(start+i).padStart(4,'0')}</div>
+        <div class="body">
+          <div class="meta">
+            <span class="badge ${badgeCls(s)}">${srcName(s)}</span>
+            ${v.title?`<span class="ttl">${v.title.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`:''}
+            <span class="tid">${(v.target_id||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>
+            ${dims(v)?`<span>${dims(v)}</span>`:''}
+            <span>${fmtTs(v.ts)}</span>
+            ${v.is_video?'<span>🎬</span>':''}
+          </div>
+          <div class="prompt" title="点击展开/收起">${(v.prompt||'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>
+        </div>
+        <button class="copy" data-p="${encodeURIComponent(v.prompt||'')}">复制</button>
+        ${svcMode?`<button class="del" data-k="${encodeURIComponent(v.key||'')}" title="删除这条提示词">🗑 删除</button>`:''}
+      </div>`;
+    }).join('');
+    $('pager').style.display='flex';
+    $('pager').innerHTML=`<button class="btn gray" id="prevB" ${page<=1?'disabled':''}>← 上一页</button>
+      <span>第 ${page} / ${totalPages} 页 · 共 ${view.length} 条</span>
+      <button class="btn gray" id="nextB" ${page>=totalPages?'disabled':''}>下一页 →</button>`;
+    $('prevB').onclick=()=>{page--;render();};
+    $('nextB').onclick=()=>{page++;render();};
+  }
+
+  function ingestJsonText(t){
+    const j=JSON.parse(t);
+    if(Array.isArray(j)) all=j.map(v=>({...v,key:v.target_id||''}));
+    else if(j && typeof j==='object') all=Object.keys(j).map(k=>({...j[k],key:k}));
+    else throw new Error('不是对象/数组');
+    all.forEach(v=>{ v.target_id=(v.target_id==null||v.target_id==='')?(v.key||''):String(v.target_id); });
+    applyFilter();
+  }
+  function loadFile(file){
+    const rd=new FileReader();
+    rd.onload=()=>{
+      try{ ingestJsonText(rd.result); toast(`已加载 ${all.length} 条`); }
+      catch(e){ toast('解析失败: '+e.message); }
+    };
+    rd.onerror=()=>toast('读取文件失败');
+    rd.readAsText(file,'utf-8');
+  }
+
+  function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),1800); }
+
+  document.addEventListener('click',e=>{
+    const p=e.target.closest('.prompt'); if(p){ p.classList.toggle('open'); return; }
+    const d=e.target.closest('.del');
+    if(d){
+      const key=decodeURIComponent(d.dataset.k);
+      if(!confirm('确定删除这条提示词？\n\n'+key+'\n\n删除后不可恢复！')) return;
+      fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})})
+        .then(r=>r.arrayBuffer()).then(b=>JSON.parse(new TextDecoder('utf-8').decode(b)))
+        .then(j=>{
+          if(j.ok){ selected.delete(key); all=all.filter(v=>v.key!==key); applyFilter(); updateDelBtn(); toast('🗑 已删除 '+key+' | 库剩余 '+j.total+' 条'); }
+          else toast('❌ 删除失败: '+(j.error||'未知错误'));
+        })
+        .catch(err=>toast('删除请求失败: '+err.message));
+      return;
+    }
+    const c=e.target.closest('.copy'); if(c){
+      const txt=decodeURIComponent(c.dataset.p);
+      const done=()=>toast('已复制 '+txt.slice(0,30)+(txt.length>30?'…':''));
+      if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(()=>fallbackCopy(txt,done));
+      else fallbackCopy(txt,done);
+    }
+  });
+  function fallbackCopy(txt,done){
+    const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){ toast('复制失败,请手动选择'); }
+    ta.remove();
+  }
+
+  $('loadBtn').onclick=()=>$('fileInput').click();
+  $('fileInput').onchange=e=>{ if(e.target.files[0]) loadFile(e.target.files[0]); e.target.value=''; };
+  $('srcFilter').onchange=e=>{ state.src=e.target.value; applyFilter(); };
+  $('resetBtn').onclick=()=>{ $('kw').value=''; state.kw=''; $('srcFilter').value='all'; state.src='all'; applyFilter(); };
+  async function postFetch(){
+    const r=await fetch('/api/fetch',{method:'POST'});
+    const buf=await r.arrayBuffer();
+    const txt=new TextDecoder('utf-8').decode(buf);
+    return JSON.parse(txt);
+  }
+  $('fetchBtn').onclick=async()=>{
+    if(!svcMode){ toast('抓取需服务模式: 请关闭本页, 双击「打开查看器.bat」重新打开'); return; }
+    const b=$('fetchBtn'), old=b.textContent;
+    b.disabled=true; b.textContent='⏳ 抓取中(约1-3分钟)...';
+    try{
+      const j=await postFetch();
+      if(j.ok){
+        try{
+          const t=await fetch('/prompt_cache.json',{cache:'no-store'});
+          if(!t.ok) throw new Error('HTTP '+t.status);
+          ingestJsonText(await t.text());
+        }catch(e){ location.reload(); return; }
+        if(j.added!=null){
+          toast('✅ 抓取完成: 新增 '+j.added+' 条 | 香蕉库共 '+j.banana_total+' 条 | 库总 '+j.total+' 条 | 列表已更新');
+        }else{
+          const lines=(j.output||'').trim().split('\n').filter(Boolean);
+          toast('✅ 抓取完成: '+(lines[lines.length-1]||'无输出')+' | 列表已更新');
+        }
+      }else{
+        const lines=(j.output||'').trim().split('\n').filter(Boolean);
+        toast('❌ 抓取失败: '+(lines[lines.length-1]||j.output||'未知错误'));
+      }
+    }catch(e){ toast('抓取请求失败: '+e.message); }
+    b.disabled=false; b.textContent=old;
+  };
+  let kwT=null;
+  $('kw').oninput=e=>{ clearTimeout(kwT); kwT=setTimeout(()=>{ state.kw=e.target.value; applyFilter(); },250); };
+  $('sortSel').onchange=e=>{ applyFilter(); };
+  $('themeBtn').onclick=()=>{ state.theme=state.theme==='dark'?'light':'dark'; document.documentElement.dataset.theme=state.theme; $('themeBtn').textContent=state.theme==='dark'?'☀️ 浅色':'🌓 深色'; localStorage.setItem('banaTheme',state.theme); };
+
+  // 支持把 json 文件拖进来
+  document.addEventListener('dragover',e=>e.preventDefault());
+  document.addEventListener('drop',e=>{
+    e.preventDefault();
+    const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(f&&f.name.toLowerCase().endsWith('.json')) loadFile(f);
+  });
+
+  document.documentElement.dataset.theme=state.theme;
+  $('themeBtn').textContent=state.theme==='dark'?'☀️ 浅色':'🌓 深色';
+  render();
+
+  // 本地服务模式(http)打开时: 自动加载库文件, 刷新/重开不用再选文件
+  if(svcMode){
+    fetch('/prompt_cache.json',{cache:'no-store'}).then(r=>{
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.text();
+    }).then(t=>{
+      try{ ingestJsonText(t); toast('已自动加载 '+all.length+' 条'); }
+      catch(e){ toast('解析失败: '+e.message); }
+    }).catch(()=>{ /* 自动加载失败则回退到手动选择 */ });
+  }else{
+    // 直接打开(file://)模式: 提示抓取需服务模式
+    $('svcTip').style.display='block';
+    $('fetchBtn').title='抓取需服务模式: 请用「打开查看器.bat」启动';
+  }
+})();
+</script>
+</body>
+</html>

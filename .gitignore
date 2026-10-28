@@ -1,0 +1,11 @@
+# 个人数据 / 运行产物不入库
+prompt_cache.json
+deleted_*.json
+*.bak
+*.tmp
+抓取日志.txt
+config.local.json
+
+# 系统
+Thumbs.db
+.DS_Store
